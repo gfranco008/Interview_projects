@@ -1,0 +1,48 @@
+Dataset size: 10000
+Class balance: false_positive 75.0% (7500), true_positive 15.0% (1500), escalated 10.0% (1000)
+Top tactics: Reconnaissance 18.6%, Discovery 18.4%, Initial Access 8.0%, Execution 7.0%, Privilege Escalation 6.3%
+Severity disagreement |gap|>=2: 33.4% (vendor vs inherent)
+Correlation: inherent vs vendor severity r=0.13; burst_index vs FP label r=0.38
+Vendor severity=5 rate: 11.1% (TP within vendor=5: 70.0%)
+Asset criticality range: 1 to 10
+
+Interaction effects:
+1. Severity x Criticality
+   Formula: severity_norm * criticality_norm
+   Rationale: Late-stage tactics on high-criticality assets are more likely true positives.
+   Empirical check: high/high TP rate 58.5% vs baseline 15.0%
+2. Burstiness x Low Criticality
+   Formula: burst_index * (1 - criticality_norm)
+   Rationale: Bursty alerts on low-criticality assets are more likely false positives.
+   Empirical check: bursty/low-criticality FP rate 96.9% vs baseline 75.0%
+
+Derived features (Task 1B):
+1. contextual_risk = inherent_severity * asset_criticality
+   Justification: Combines intrinsic threat severity with asset impact to capture cross-axis risk.
+   Mathematical justification: Let S=inherent_severity and C=asset_criticality; S*C is a multiplicative interaction.
+   Mathematical justification: If P(TP|S,C) grows super-multiplicatively, S*C increases class separability.
+   Expected correlation: Higher values should correlate with fewer false positives.
+2. burst_index = log1p(alert_count_1h) / log1p(alert_count_24h)
+   Justification: Measures short-term burstiness relative to daily volume, a proxy for noisy rules.
+   Mathematical justification: Uses log1p to stabilize variance and bound extremes of count data.
+   Mathematical justification: The ratio is scale-stable and bounded in [0,1] when count_1h <= count_24h.
+   Expected correlation: Higher values should correlate with more false positives.
+3. severity_gap = inherent_severity - vendor_severity
+   Justification: Captures disagreement between intrinsic threat and vendor scoring.
+   Mathematical justification: Signed residual e = S_inherent - S_vendor measures calibration bias.
+   Mathematical justification: Large negative e implies vendor inflation, which is predictive of FPs.
+   Expected correlation: Large negative gaps indicate likely false positives.
+4. low_crit_burst = burst_index * (1 - asset_criticality / 10)
+   Justification: Emphasizes burstiness on lower-criticality assets where noisy alerts are common.
+   Mathematical justification: Interaction term B*(1-C/10) down-weights burstiness as criticality increases.
+   Mathematical justification: Bounded in [0,1], preserving scale while encoding cross-axis interaction.
+   Expected correlation: Higher values should correlate with more false positives.
+5. ioc_weighted_risk = has_ioc_match * inherent_severity * asset_criticality
+   Justification: Gates risk by IOC evidence while scaling with threat and asset impact.
+   Mathematical justification: With I in {0,1}, I*S*C is zero unless IOC evidence is present.
+   Mathematical justification: Multiplicative form amplifies risk when all three axes align.
+   Expected correlation: Higher values should correlate with fewer false positives.
+
+Validation warnings:
+- Vendor severity 5 is not rare enough (over 10%).
+- Fewer than 8 rules have FP rates below 10%.
