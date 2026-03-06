@@ -39,10 +39,6 @@ Justification: multiplies threat intrinsic severity by business impact; monotone
 Justification: bounded, scale-stable burstiness ratio.
 - `severity_gap = inherent_severity - vendor_severity`.
 Justification: signed residual capturing severity disagreement (negative gaps imply vendor inflation).
-- `low_crit_burst = burst_index * (1 - asset_criticality / 10)`.
-Justification: interaction that emphasizes burstiness on low-criticality assets.
-- `ioc_weighted_risk = has_ioc_match * inherent_severity * asset_criticality`.
-Justification: IOC gate on risk that scales with inherent severity and asset impact.
 
 Key distribution assumptions
 
@@ -53,5 +49,4 @@ Key distribution assumptions
 - Vendor severity is centered on 3, with severity 5 rare; it intentionally disagrees with inherent severity to reflect real-world inconsistency.
 - False positives are biased toward business hours; true positives are uniform across the day.
 - IOC matches are generated at ~40% for true positives and ~3% for false positives (escalated is intermediate).
-
 

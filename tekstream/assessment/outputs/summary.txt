@@ -19,29 +19,19 @@ Interaction effects:
 Derived features (Task 1B):
 1. contextual_risk = inherent_severity * asset_criticality
    Justification: Combines intrinsic threat severity with asset impact to capture cross-axis risk.
-   Mathematical justification: Let S=inherent_severity and C=asset_criticality; S*C is a multiplicative interaction.
-   Mathematical justification: If P(TP|S,C) grows super-multiplicatively, S*C increases class separability.
+   Mathematical justification: Let S=inherent_severity and C=asset_criticality; S*C is a multiplicative interaction. 
+         If P(TP|S,C) grows super-multiplicatively, S*C increases class separability.
    Expected correlation: Higher values should correlate with fewer false positives.
 2. burst_index = log1p(alert_count_1h) / log1p(alert_count_24h)
    Justification: Measures short-term burstiness relative to daily volume, a proxy for noisy rules.
-   Mathematical justification: Uses log1p to stabilize variance and bound extremes of count data.
-   Mathematical justification: The ratio is scale-stable and bounded in [0,1] when count_1h <= count_24h.
+   Mathematical justification: Uses log1p to stabilize variance and bound extremes of count data. 
+         The ratio is scale-stable and bounded in [0,1] when count_1h <= count_24h.
    Expected correlation: Higher values should correlate with more false positives.
 3. severity_gap = inherent_severity - vendor_severity
    Justification: Captures disagreement between intrinsic threat and vendor scoring.
-   Mathematical justification: Signed residual e = S_inherent - S_vendor measures calibration bias.
-   Mathematical justification: Large negative e implies vendor inflation, which is predictive of FPs.
+   Mathematical justification: Signed residual e = S_inherent - S_vendor measures calibration bias. 
+         Large negative e implies vendor inflation, which is predictive of FPs.
    Expected correlation: Large negative gaps indicate likely false positives.
-4. low_crit_burst = burst_index * (1 - asset_criticality / 10)
-   Justification: Emphasizes burstiness on lower-criticality assets where noisy alerts are common.
-   Mathematical justification: Interaction term B*(1-C/10) down-weights burstiness as criticality increases.
-   Mathematical justification: Bounded in [0,1], preserving scale while encoding cross-axis interaction.
-   Expected correlation: Higher values should correlate with more false positives.
-5. ioc_weighted_risk = has_ioc_match * inherent_severity * asset_criticality
-   Justification: Gates risk by IOC evidence while scaling with threat and asset impact.
-   Mathematical justification: With I in {0,1}, I*S*C is zero unless IOC evidence is present.
-   Mathematical justification: Multiplicative form amplifies risk when all three axes align.
-   Expected correlation: Higher values should correlate with fewer false positives.
 
 Validation warnings:
 - Vendor severity 5 is not rare enough (over 10%).

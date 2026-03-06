@@ -6,6 +6,7 @@ This module produces a 10k-row CSV of SOC alert events with realistic
 distributions, correlated features, and engineered interaction effects.
 It is intentionally deterministic given a random seed.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -18,8 +19,7 @@ import uuid
 from collections import Counter
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, Iterable, List, Tuple, Any, Optional
-
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 # -------------------------
 # Configuration
@@ -150,7 +150,11 @@ DEFAULT_CONFIG: dict = {
     "tp_score_noise": 0.2,
     "class_balance": {"true_positive": 0.15, "escalated": 0.10, "false_positive": 0.75},
     "vendor5_tp_target": 0.70,
-    "ioc_match_rates": {"true_positive": 0.40, "false_positive": 0.03, "escalated": 0.12},
+    "ioc_match_rates": {
+        "true_positive": 0.40,
+        "false_positive": 0.03,
+        "escalated": 0.12,
+    },
     "fp_business_hour_bias": 0.75,
     "business_hours": [8, 17],
 }
@@ -163,8 +167,7 @@ DERIVED_FEATURES = [
             "Combines intrinsic threat severity with asset impact to capture cross-axis risk."
         ),
         "math_justification": [
-            "Let S=inherent_severity and C=asset_criticality; S*C is a multiplicative interaction.",
-            "If P(TP|S,C) grows super-multiplicatively, S*C increases class separability.",
+            "Let S=inherent_severity and C=asset_criticality; S*C is a multiplicative interaction. \n         If P(TP|S,C) grows super-multiplicatively, S*C increases class separability.",
         ],
         "expected_correlation": "Higher values should correlate with fewer false positives.",
     },
@@ -175,8 +178,7 @@ DERIVED_FEATURES = [
             "Measures short-term burstiness relative to daily volume, a proxy for noisy rules."
         ),
         "math_justification": [
-            "Uses log1p to stabilize variance and bound extremes of count data.",
-            "The ratio is scale-stable and bounded in [0,1] when count_1h <= count_24h.",
+            "Uses log1p to stabilize variance and bound extremes of count data. \n         The ratio is scale-stable and bounded in [0,1] when count_1h <= count_24h.",
         ],
         "expected_correlation": "Higher values should correlate with more false positives.",
     },
@@ -187,34 +189,9 @@ DERIVED_FEATURES = [
             "Captures disagreement between intrinsic threat and vendor scoring."
         ),
         "math_justification": [
-            "Signed residual e = S_inherent - S_vendor measures calibration bias.",
-            "Large negative e implies vendor inflation, which is predictive of FPs.",
+            "Signed residual e = S_inherent - S_vendor measures calibration bias. \n         Large negative e implies vendor inflation, which is predictive of FPs.",
         ],
         "expected_correlation": "Large negative gaps indicate likely false positives.",
-    },
-    {
-        "name": "low_crit_burst",
-        "formula": "burst_index * (1 - asset_criticality / 10)",
-        "justification": (
-            "Emphasizes burstiness on lower-criticality assets where noisy alerts are common."
-        ),
-        "math_justification": [
-            "Interaction term B*(1-C/10) down-weights burstiness as criticality increases.",
-            "Bounded in [0,1], preserving scale while encoding cross-axis interaction.",
-        ],
-        "expected_correlation": "Higher values should correlate with more false positives.",
-    },
-    {
-        "name": "ioc_weighted_risk",
-        "formula": "has_ioc_match * inherent_severity * asset_criticality",
-        "justification": (
-            "Gates risk by IOC evidence while scaling with threat and asset impact."
-        ),
-        "math_justification": [
-            "With I in {0,1}, I*S*C is zero unless IOC evidence is present.",
-            "Multiplicative form amplifies risk when all three axes align.",
-        ],
-        "expected_correlation": "Higher values should correlate with fewer false positives.",
     },
 ]
 
@@ -257,8 +234,6 @@ DERIVED_COLUMNS = [
     "contextual_risk",
     "burst_index",
     "severity_gap",
-    "low_crit_burst",
-    "ioc_weighted_risk",
 ]
 
 OPTIONAL_EXTRA_COLUMNS = [
@@ -337,6 +312,7 @@ def build_output_columns(include_extras: bool) -> List[str]:
 # -------------------------
 # Helpers
 # -------------------------
+
 
 def normalize_weights(
     items: Iterable[Tuple[Any, float]] | Dict[Any, float],
@@ -459,7 +435,9 @@ def prepare_config(raw_config: dict) -> dict:
     config = copy.deepcopy(raw_config)
     config["tactic_weights"] = normalize_weights(config["tactic_weights"])
     config["asset_type_weights"] = normalize_weights(config["asset_type_weights"])
-    config["user_privilege_weights"] = normalize_weights(config["user_privilege_weights"])
+    config["user_privilege_weights"] = normalize_weights(
+        config["user_privilege_weights"]
+    )
     config["vendor_severity_weights"] = normalize_weights(
         config["vendor_severity_weights"], value_cast=int
     )
@@ -472,7 +450,9 @@ def prepare_config(raw_config: dict) -> dict:
 
     balance = config["class_balance"]
     if "false_positive" not in balance:
-        balance["false_positive"] = 1.0 - balance["true_positive"] - balance["escalated"]
+        balance["false_positive"] = (
+            1.0 - balance["true_positive"] - balance["escalated"]
+        )
     config["class_balance"] = balance
     return config
 
@@ -512,7 +492,9 @@ def validate_config(config: dict) -> None:
     else:
         if "true_positive" not in class_balance or "escalated" not in class_balance:
             errors.append("`class_balance` must include true_positive and escalated.")
-        total = sum(float(v) for v in class_balance.values() if isinstance(v, (int, float)))
+        total = sum(
+            float(v) for v in class_balance.values() if isinstance(v, (int, float))
+        )
         if abs(total - 1.0) > 1e-3:
             errors.append(f"`class_balance` must sum to 1.0 (currently {total:.3f}).")
 
@@ -533,13 +515,10 @@ def validate_config(config: dict) -> None:
     for asset in asset_types:
         if asset not in crit_weights:
             errors.append(
-                "`asset_criticality_weights` must include asset_type "
-                f"'{asset}'."
+                f"`asset_criticality_weights` must include asset_type '{asset}'."
             )
         elif not crit_weights[asset]:
-            errors.append(
-                f"`asset_criticality_weights['{asset}']` must be non-empty."
-            )
+            errors.append(f"`asset_criticality_weights['{asset}']` must be non-empty.")
 
     if errors:
         message = "Invalid config:\n" + "\n".join(f"- {err}" for err in errors)
@@ -590,10 +569,10 @@ def random_private_ip(rng: random.Random) -> str:
     """
     block = rng.choice([10, 172, 192])
     if block == 10:
-        return f"10.{rng.randint(0,255)}.{rng.randint(0,255)}.{rng.randint(1,254)}"
+        return f"10.{rng.randint(0, 255)}.{rng.randint(0, 255)}.{rng.randint(1, 254)}"
     if block == 172:
-        return f"172.{rng.randint(16,31)}.{rng.randint(0,255)}.{rng.randint(1,254)}"
-    return f"192.168.{rng.randint(0,255)}.{rng.randint(1,254)}"
+        return f"172.{rng.randint(16, 31)}.{rng.randint(0, 255)}.{rng.randint(1, 254)}"
+    return f"192.168.{rng.randint(0, 255)}.{rng.randint(1, 254)}"
 
 
 def derive_alert_type(rule_fp_rate: float, technique_fp_rate: float) -> str:
@@ -767,6 +746,7 @@ def pearson(xs: List[float], ys: List[float]) -> float:
 # Build reference data
 # -------------------------
 
+
 def build_rules(
     rng: random.Random, config: dict
 ) -> Tuple[List[Tuple[str, float]], Dict[str, float]]:
@@ -913,33 +893,32 @@ def build_sources(
         detection_vendor = rng.choice(DETECTION_VENDORS)
 
         weight = rng.lognormvariate(0.0, config["source_weight_sigma"])
-        source_weights.append(
-            (
-                {
-                    "source_id": source_id,
-                    "asset_type": asset_type,
-                    "asset_criticality": asset_criticality,
-                    "user_privilege_level": privilege,
-                    "source_rule": rule_id,
-                    "rule_fp_rate": rule_fp,
-                    "source_burstiness": source_burstiness,
-                    "asset_id": asset_id,
-                    "asset_hostname": asset_hostname,
-                    "asset_ip": asset_ip,
-                    "user_id": user_id,
-                    "user_department": user_department,
-                    "detection_tool": detection_tool,
-                    "detection_vendor": detection_vendor,
-                },
-                weight,
-            )
-        )
+        source_weights.append((
+            {
+                "source_id": source_id,
+                "asset_type": asset_type,
+                "asset_criticality": asset_criticality,
+                "user_privilege_level": privilege,
+                "source_rule": rule_id,
+                "rule_fp_rate": rule_fp,
+                "source_burstiness": source_burstiness,
+                "asset_id": asset_id,
+                "asset_hostname": asset_hostname,
+                "asset_ip": asset_ip,
+                "user_id": user_id,
+                "user_department": user_department,
+                "detection_tool": detection_tool,
+                "detection_vendor": detection_vendor,
+            },
+            weight,
+        ))
     return source_weights
 
 
 # -------------------------
 # Sampling functions
 # -------------------------
+
 
 def sample_vendor_severity(
     rng: random.Random, inherent_severity: int, config: dict
@@ -974,9 +953,7 @@ def sample_vendor_severity(
     return vendor
 
 
-def sample_asset_criticality(
-    rng: random.Random, asset_type: str, config: dict
-) -> int:
+def sample_asset_criticality(rng: random.Random, asset_type: str, config: dict) -> int:
     """Sample asset criticality conditioned on asset type.
 
     Parameters
@@ -1046,11 +1023,15 @@ def sample_counts(
 
     scalars = config["count_scalars"]
     base = scalars["base_offset"] + scalars["base_multiplier"] * burst_prop
-    severity_adjust = scalars["severity_adjust_base"] - scalars["severity_adjust_step"] * inherent_severity
+    severity_adjust = (
+        scalars["severity_adjust_base"]
+        - scalars["severity_adjust_step"] * inherent_severity
+    )
     lam24 = max(scalars["lam24_min"], base * severity_adjust)
     lam1 = max(
         scalars["lam1_min"],
-        lam24 * (scalars["lam1_ratio_base"] + scalars["lam1_ratio_multiplier"] * burst_prop),
+        lam24
+        * (scalars["lam1_ratio_base"] + scalars["lam1_ratio_multiplier"] * burst_prop),
     )
 
     count_24h = poisson(rng, lam24)
@@ -1217,7 +1198,11 @@ def enforce_vendor5_tp_rate(rows: List[dict], target_rate: float) -> None:
         reverse=True,
     )
     demotable = sorted(
-        (r for r in rows if r["disposition"] == "true_positive" and r["vendor_severity"] != 5),
+        (
+            r
+            for r in rows
+            if r["disposition"] == "true_positive" and r["vendor_severity"] != 5
+        ),
         key=lambda r: r["tp_score"],
     )
 
@@ -1238,6 +1223,7 @@ def enforce_vendor5_tp_rate(rows: List[dict], target_rate: float) -> None:
 # -------------------------
 # Generation
 # -------------------------
+
 
 def generate_rows(
     n_rows: int,
@@ -1308,7 +1294,6 @@ def generate_rows(
         burst_index = compute_burst_index(alert_count_1h, alert_count_24h)
         severity_gap = inherent_severity - vendor_severity
         contextual_risk = inherent_severity * source["asset_criticality"]
-        low_crit_burst = burst_index * (1 - source["asset_criticality"] / 10)
 
         severity_norm = inherent_severity / 4
         criticality_norm = source["asset_criticality"] / 10
@@ -1326,53 +1311,53 @@ def generate_rows(
             * (1 if source["user_privilege_level"] == "service_account" else 0)
         )
 
-        tp_score += tp_weights["interaction_sev_crit"] * (severity_norm * criticality_norm)
+        tp_score += tp_weights["interaction_sev_crit"] * (
+            severity_norm * criticality_norm
+        )
         tp_score += tp_weights["interaction_burst_lowcrit"] * (
             burst_index * (1 - criticality_norm)
         )
-        tp_score += tp_weights["vendor_over_inherent"] * max(0.0, vendor_norm - severity_norm)
+        tp_score += tp_weights["vendor_over_inherent"] * max(
+            0.0, vendor_norm - severity_norm
+        )
         tp_score += tp_weights["vendor5_bonus"] * (1 if vendor_severity == 5 else 0)
         tp_score += rng.normalvariate(0, config["tp_score_noise"])
 
         row = {
-                "row_index": i,
-                "source_id": source["source_id"],
-                "mitre_tactic": tactic,
-                "mitre_technique": technique,
-                "inherent_severity": inherent_severity,
-                "vendor_severity": vendor_severity,
-                "asset_type": source["asset_type"],
-                "asset_criticality": source["asset_criticality"],
-                "source_rule": source["source_rule"],
-                "user_privilege_level": source["user_privilege_level"],
-                "alert_count_1h": alert_count_1h,
-                "alert_count_24h": alert_count_24h,
-                "time_since_last_alert": time_since_last,
-                "technique_fp_rate": technique_fp,
-                "rule_fp_rate": source["rule_fp_rate"],
-                "burst_index": burst_index,
-                "severity_gap": severity_gap,
-                "contextual_risk": contextual_risk,
-                "low_crit_burst": low_crit_burst,
-                "ioc_weighted_risk": 0.0,
-                "tp_score": tp_score,
-            }
+            "row_index": i,
+            "source_id": source["source_id"],
+            "mitre_tactic": tactic,
+            "mitre_technique": technique,
+            "inherent_severity": inherent_severity,
+            "vendor_severity": vendor_severity,
+            "asset_type": source["asset_type"],
+            "asset_criticality": source["asset_criticality"],
+            "source_rule": source["source_rule"],
+            "user_privilege_level": source["user_privilege_level"],
+            "alert_count_1h": alert_count_1h,
+            "alert_count_24h": alert_count_24h,
+            "time_since_last_alert": time_since_last,
+            "technique_fp_rate": technique_fp,
+            "rule_fp_rate": source["rule_fp_rate"],
+            "burst_index": burst_index,
+            "severity_gap": severity_gap,
+            "contextual_risk": contextual_risk,
+            "tp_score": tp_score,
+        }
 
         if include_extras:
-            row.update(
-                {
-                    "alert_type": derive_alert_type(source["rule_fp_rate"], technique_fp),
-                    "detection_tool": source["detection_tool"],
-                    "detection_vendor": source["detection_vendor"],
-                    "asset_id": source["asset_id"],
-                    "asset_hostname": source["asset_hostname"],
-                    "asset_ip": source["asset_ip"],
-                    "user_id": source["user_id"],
-                    "user_department": source["user_department"],
-                    "process_name": sample_process_name(rng, tactic, source["asset_type"]),
-                    "network_direction": derive_network_direction(tactic),
-                }
-            )
+            row.update({
+                "alert_type": derive_alert_type(source["rule_fp_rate"], technique_fp),
+                "detection_tool": source["detection_tool"],
+                "detection_vendor": source["detection_vendor"],
+                "asset_id": source["asset_id"],
+                "asset_hostname": source["asset_hostname"],
+                "asset_ip": source["asset_ip"],
+                "user_id": source["user_id"],
+                "user_department": source["user_department"],
+                "process_name": sample_process_name(rng, tactic, source["asset_type"]),
+                "network_direction": derive_network_direction(tactic),
+            })
 
         rows.append(row)
 
@@ -1388,11 +1373,6 @@ def generate_rows(
             sep=" "
         )
         row["has_ioc_match"] = rng.random() < ioc_prob
-        row["ioc_weighted_risk"] = (
-            (1 if row["has_ioc_match"] else 0)
-            * row["inherent_severity"]
-            * row["asset_criticality"]
-        )
         row["alert_id"] = str(uuid7_from_sequence(base_uuid_ms, row["row_index"]))
 
     return rows
@@ -1401,6 +1381,7 @@ def generate_rows(
 # -------------------------
 # Summary
 # -------------------------
+
 
 def validate_rows(rows: List[dict], required_columns: List[str]) -> List[str]:
     """Validate required columns exist across all rows.
@@ -1490,10 +1471,9 @@ def validate_distributions(
     vendor5_rows = [r for r in rows if r["vendor_severity"] == 5]
     if vendor5_rows:
         vendor5_rate = len(vendor5_rows) / n
-        tp_rate = (
-            sum(1 for r in vendor5_rows if r["disposition"] == "true_positive")
-            / len(vendor5_rows)
-        )
+        tp_rate = sum(
+            1 for r in vendor5_rows if r["disposition"] == "true_positive"
+        ) / len(vendor5_rows)
         if vendor5_rate > 0.10:
             warnings.append("Vendor severity 5 is not rare enough (over 10%).")
         if tp_rate < config["vendor5_tp_target"]:
@@ -1563,9 +1543,7 @@ def build_summary(rows: List[dict], config: dict, warnings: List[str]) -> str:
     disagreement_rate = 100.0 * sum(disagreement) / n if n else 0.0
 
     high_sev_high_crit = [
-        r
-        for r in rows
-        if r["inherent_severity"] >= 3 and r["asset_criticality"] >= 8
+        r for r in rows if r["inherent_severity"] >= 3 and r["asset_criticality"] >= 8
     ]
     high_sev_tp_rate = (
         100.0
@@ -1574,9 +1552,7 @@ def build_summary(rows: List[dict], config: dict, warnings: List[str]) -> str:
     )
 
     bursty_low_crit = [
-        r
-        for r in rows
-        if r["burst_index"] >= 0.7 and r["asset_criticality"] <= 3
+        r for r in rows if r["burst_index"] >= 0.7 and r["asset_criticality"] <= 3
     ]
     bursty_fp_rate = (
         100.0
@@ -1608,12 +1584,10 @@ def build_summary(rows: List[dict], config: dict, warnings: List[str]) -> str:
         f"({counts.get('escalated', 0)})"
     )
     lines.append(
-        "Top tactics: "
-        + ", ".join(f"{t} {pct(c):.1f}%" for t, c in top_tactics)
+        "Top tactics: " + ", ".join(f"{t} {pct(c):.1f}%" for t, c in top_tactics)
     )
     lines.append(
-        "Severity disagreement |gap|>=2: "
-        f"{disagreement_rate:.1f}% (vendor vs inherent)"
+        f"Severity disagreement |gap|>=2: {disagreement_rate:.1f}% (vendor vs inherent)"
     )
     lines.append(
         "Correlation: inherent vs vendor severity r="
@@ -1663,6 +1637,7 @@ def build_summary(rows: List[dict], config: dict, warnings: List[str]) -> str:
 # -------------------------
 # Main
 # -------------------------
+
 
 def main() -> None:
     """CLI entrypoint to generate the dataset and summary.
