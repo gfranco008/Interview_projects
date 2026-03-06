@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-03-06T18:35:30Z",
+  "generated_at": "2026-03-06T20:13:06Z",
   "dataset": "/Users/gfranco/Documents/qvest/tekstream/assessment/outputs/alerts_dataset.csv",
   "model_name": "XGBoost (tuned)",
   "calibration_method": "isotonic",
