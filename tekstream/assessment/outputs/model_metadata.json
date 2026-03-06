@@ -1,0 +1,45 @@
+{
+  "generated_at": "2026-03-06T18:35:30Z",
+  "dataset": "/Users/gfranco/Documents/qvest/tekstream/assessment/outputs/alerts_dataset.csv",
+  "model_name": "XGBoost (tuned)",
+  "calibration_method": "isotonic",
+  "include_ioc": false,
+  "include_extras": true,
+  "numeric_features": [
+    "inherent_severity",
+    "vendor_severity",
+    "asset_criticality",
+    "alert_count_1h",
+    "alert_count_24h",
+    "time_since_last_alert",
+    "contextual_risk",
+    "burst_index",
+    "severity_gap",
+    "low_crit_burst"
+  ],
+  "categorical_features": [
+    "source_rule",
+    "mitre_tactic",
+    "mitre_technique",
+    "asset_type",
+    "user_privilege_level",
+    "alert_type",
+    "detection_tool",
+    "detection_vendor",
+    "user_department",
+    "process_name",
+    "network_direction"
+  ],
+  "split_sizes": {
+    "train": 6000,
+    "val": 2000,
+    "test": 2000
+  },
+  "cv_auc": 0.9675155555555556,
+  "cv_std": 0.0021520059867026135,
+  "xgb_best_params": {
+    "learning_rate": 0.05,
+    "max_depth": 3,
+    "n_estimators": 250
+  }
+}

@@ -1,1 +1,7 @@
-# No external dependencies required for Task 1 generation
+numpy
+pandas
+scikit-learn
+matplotlib
+pyyaml
+shap
+xgboost
